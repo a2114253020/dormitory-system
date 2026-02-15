@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  admin
+  dorm_manager
+  student
+}
+
+enum TicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student   Student?
+  tickets   Ticket[]
+}
+
+model Building {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  rooms     Room[]
+
+  @@unique([name])
+}
+
+model Room {
+  id         String   @id @default(cuid())
+  buildingId String
+  floor      Int
+  number     String
+  createdAt  DateTime @default(now())
+
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  beds       Bed[]
+
+  @@unique([buildingId, floor, number])
+}
+
+model Bed {
+  id        String   @id @default(cuid())
+  roomId    String
+  label     String
+  createdAt DateTime @default(now())
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  student   Student?
+
+  @@unique([roomId, label])
+}
+
+model Student {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  studentNo String   @unique
+  bedId     String?  @unique
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bed       Bed?     @relation(fields: [bedId], references: [id])
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  title       String
+  description String
+  status      TicketStatus @default(open)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,36 @@
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+
+export type User = { id: string; email: string; name: string; role: 'admin' | 'dorm_manager' | 'student' };
+
+export function getToken() {
+  return localStorage.getItem('token');
+}
+
+export function setToken(t: string | null) {
+  if (t) localStorage.setItem('token', t);
+  else localStorage.removeItem('token');
+}
+
+async function req(path: string, init: RequestInit = {}) {
+  const token = getToken();
+  const headers = new Headers(init.headers);
+  headers.set('Content-Type', 'application/json');
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || 'request_failed');
+  return data;
+}
+
+export const api = {
+  health: () => req('/health'),
+  login: (email: string, password: string) => req('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  buildings: () => req('/buildings'),
+  createBuilding: (name: string) => req('/buildings', { method: 'POST', body: JSON.stringify({ name }) }),
+  createRoom: (buildingId: string, floor: number, number: string) => req('/rooms', { method: 'POST', body: JSON.stringify({ buildingId, floor, number }) }),
+  createBed: (roomId: string, label: string) => req('/beds', { method: 'POST', body: JSON.stringify({ roomId, label }) }),
+  tickets: () => req('/tickets'),
+  createTicket: (title: string, description: string) => req('/tickets', { method: 'POST', body: JSON.stringify({ title, description }) }),
+  updateTicket: (id: string, status: string) => req(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+};
