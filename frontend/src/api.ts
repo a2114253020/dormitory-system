@@ -1,4 +1,6 @@
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000';
+// Prefer same-origin proxy to avoid CORS/proxy issues.
+// In dev (docker), Vite proxy maps /api -> backend.
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 export type User = { id: string; email: string; name: string; role: 'admin' | 'dorm_manager' | 'student' };
 
