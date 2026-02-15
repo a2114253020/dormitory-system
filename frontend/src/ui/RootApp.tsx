@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Form, Input, Layout, Menu, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Form, Input, InputNumber, Layout, Menu, Select, Space, Table, Tag, Typography, message } from 'antd';
 import { api, setToken, getToken } from '../api';
 
 const { Header, Content } = Layout;
@@ -108,8 +108,6 @@ function Login({ onLogged }: { onLogged: (u: any) => void }) {
 }
 
 function Buildings({ buildings, onRefresh }: { buildings: any[]; onRefresh: () => Promise<void> }) {
-  const [creating, setCreating] = useState(false);
-
   const rows = useMemo(() => {
     const out: any[] = [];
     for (const b of buildings) {
@@ -130,7 +128,7 @@ function Buildings({ buildings, onRefresh }: { buildings: any[]; onRefresh: () =
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       <Card title="创建楼栋/房间/床位">
-        <CreateEntities onDone={onRefresh} />
+        <CreateEntities buildings={buildings} onDone={onRefresh} />
       </Card>
       <Card title="床位列表">
         <Table
@@ -146,23 +144,36 @@ function Buildings({ buildings, onRefresh }: { buildings: any[]; onRefresh: () =
   );
 }
 
-function CreateEntities({ onDone }: { onDone: () => Promise<void> }) {
+function CreateEntities({ buildings, onDone }: { buildings: any[]; onDone: () => Promise<void> }) {
   const [msgApi, contextHolder] = message.useMessage();
   const [bForm] = Form.useForm();
   const [rForm] = Form.useForm();
   const [bedForm] = Form.useForm();
+
+  const buildingOptions = buildings.map((b) => ({ label: b.name, value: b.id }));
+  const selectedBuildingId = Form.useWatch('buildingId', rForm);
+  const roomsOfSelectedBuilding = (buildings.find((b) => b.id === selectedBuildingId)?.rooms || []) as any[];
+  const roomOptions = roomsOfSelectedBuilding.map((r) => ({ label: `${r.floor}-${r.number}`, value: r.id }));
 
   return (
     <>
       {contextHolder}
       <Space align="start" wrap>
         <Card size="small" title="楼栋" style={{ width: 320 }}>
-          <Form form={bForm} layout="vertical" onFinish={async (v) => {
-            await api.createBuilding(v.name);
-            msgApi.success('已创建楼栋');
-            bForm.resetFields();
-            await onDone();
-          }}>
+          <Form
+            form={bForm}
+            layout="vertical"
+            onFinish={async (v) => {
+              try {
+                await api.createBuilding(v.name);
+                msgApi.success('已创建楼栋');
+                bForm.resetFields();
+                await onDone();
+              } catch (e: any) {
+                msgApi.error(String(e.message || e));
+              }
+            }}
+          >
             <Form.Item name="name" label="名称" rules={[{ required: true }]}>
               <Input placeholder="如：1号楼" />
             </Form.Item>
@@ -171,17 +182,25 @@ function CreateEntities({ onDone }: { onDone: () => Promise<void> }) {
         </Card>
 
         <Card size="small" title="房间" style={{ width: 320 }}>
-          <Form form={rForm} layout="vertical" onFinish={async (v) => {
-            await api.createRoom(v.buildingId, Number(v.floor), v.number);
-            msgApi.success('已创建房间');
-            rForm.resetFields();
-            await onDone();
-          }}>
-            <Form.Item name="buildingId" label="楼栋ID" rules={[{ required: true }]}>
-              <Input placeholder="从 /buildings 返回中复制" />
+          <Form
+            form={rForm}
+            layout="vertical"
+            onFinish={async (v) => {
+              try {
+                await api.createRoom(v.buildingId, Number(v.floor), v.number);
+                msgApi.success('已创建房间');
+                rForm.resetFields();
+                await onDone();
+              } catch (e: any) {
+                msgApi.error(String(e.message || e));
+              }
+            }}
+          >
+            <Form.Item name="buildingId" label="楼栋" rules={[{ required: true }]}>
+              <Select options={buildingOptions} placeholder="选择楼栋" />
             </Form.Item>
             <Form.Item name="floor" label="楼层" rules={[{ required: true }]}>
-              <Input />
+              <InputNumber style={{ width: '100%' }} min={1} placeholder="如：3" />
             </Form.Item>
             <Form.Item name="number" label="房间号" rules={[{ required: true }]}>
               <Input placeholder="如：302" />
@@ -191,14 +210,43 @@ function CreateEntities({ onDone }: { onDone: () => Promise<void> }) {
         </Card>
 
         <Card size="small" title="床位" style={{ width: 320 }}>
-          <Form form={bedForm} layout="vertical" onFinish={async (v) => {
-            await api.createBed(v.roomId, v.label);
-            msgApi.success('已创建床位');
-            bedForm.resetFields();
-            await onDone();
-          }}>
-            <Form.Item name="roomId" label="房间ID" rules={[{ required: true }]}>
-              <Input placeholder="从 /buildings 返回中复制" />
+          <Form
+            form={bedForm}
+            layout="vertical"
+            onFinish={async (v) => {
+              try {
+                await api.createBed(v.roomId, v.label);
+                msgApi.success('已创建床位');
+                bedForm.resetFields();
+                await onDone();
+              } catch (e: any) {
+                msgApi.error(String(e.message || e));
+              }
+            }}
+          >
+            <Form.Item name="buildingId2" label="楼栋" rules={[{ required: true }]}>
+              <Select
+                options={buildingOptions}
+                placeholder="选择楼栋"
+                onChange={() => {
+                  bedForm.setFieldValue('roomId', undefined);
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              shouldUpdate={(prev, cur) => prev.buildingId2 !== cur.buildingId2}
+              noStyle
+            >
+              {() => {
+                const bid2 = bedForm.getFieldValue('buildingId2');
+                const rooms = (buildings.find((b) => b.id === bid2)?.rooms || []) as any[];
+                const ropts = rooms.map((r) => ({ label: `${r.floor}-${r.number}`, value: r.id }));
+                return (
+                  <Form.Item name="roomId" label="房间" rules={[{ required: true }]}>
+                    <Select options={ropts} placeholder="选择房间" />
+                  </Form.Item>
+                );
+              }}
             </Form.Item>
             <Form.Item name="label" label="床位标签" rules={[{ required: true }]}>
               <Input placeholder="如：A / B / 上铺 / 下铺" />
@@ -208,7 +256,7 @@ function CreateEntities({ onDone }: { onDone: () => Promise<void> }) {
         </Card>
       </Space>
       <Typography.Paragraph style={{ marginTop: 12, color: '#666' }}>
-        这是 MVP UI：为了不加路由和复杂联动，这里暂时用 ID 录入。后续我会补成下拉联动选择（楼栋→房间→床位）。
+        现在已支持下拉联动选择楼栋/房间，并且提交失败会显示明确错误信息。
       </Typography.Paragraph>
     </>
   );
