@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type Secret, type SignOptions } from 'jsonwebtoken';
 import { Role } from '@prisma/client';
 import type { Request, Response, NextFunction } from 'express';
 
@@ -18,7 +18,9 @@ export const JWT_SECRET = () => mustEnv('JWT_SECRET');
 export const JWT_EXPIRES_IN = () => process.env.JWT_EXPIRES_IN || '7d';
 
 export function signToken(payload: JwtPayload) {
-  return jwt.sign(payload, JWT_SECRET(), { expiresIn: JWT_EXPIRES_IN() });
+  const secret: Secret = JWT_SECRET();
+  const options: SignOptions = { expiresIn: JWT_EXPIRES_IN() as any };
+  return jwt.sign(payload, secret, options);
 }
 
 export function authRequired(req: Request, res: Response, next: NextFunction) {
