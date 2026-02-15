@@ -9,6 +9,14 @@ import { Role, TicketStatus } from '@prisma/client';
 const app = express();
 app.use(express.json());
 
+// Basic error shielding (prevents Zod errors from crashing the process)
+process.on('uncaughtException', (err) => {
+  console.error('uncaughtException', err);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('unhandledRejection', err);
+});
+
 app.use(cors({
   origin: process.env.CORS_ORIGIN || true,
   credentials: true,
@@ -18,7 +26,8 @@ app.get('/health', (_req, res) => res.json({ ok: true }));
 
 // --- auth ---
 app.post('/auth/login', async (req, res) => {
-  const body = z.object({ email: z.string().email(), password: z.string().min(1) }).parse(req.body);
+  // Allow non-email usernames in MVP (admin@local)
+  const body = z.object({ email: z.string().min(1), password: z.string().min(1) }).parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: body.email } });
   if (!user) return res.status(401).json({ error: 'invalid_credentials' });
   const ok = await bcrypt.compare(body.password, user.password);
@@ -110,6 +119,15 @@ app.patch('/tickets/:id', authRequired, requireRole([Role.admin, Role.dorm_manag
   const body = z.object({ status: z.nativeEnum(TicketStatus) }).parse(req.body);
   const t = await prisma.ticket.update({ where: { id }, data: body });
   res.json(t);
+});
+
+// Express error handler
+app.use((err: any, _req: any, res: any, _next: any) => {
+  if (err?.name === 'ZodError') {
+    return res.status(400).json({ error: 'validation_error', details: err.issues });
+  }
+  console.error(err);
+  return res.status(500).json({ error: 'internal_error' });
 });
 
 const port = Number(process.env.PORT || 3000);
