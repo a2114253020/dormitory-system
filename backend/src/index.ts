@@ -39,6 +39,13 @@ app.post('/auth/login', ah(async (req, res) => {
   return res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
 }));
 
+app.get('/auth/me', authRequired, ah(async (req, res) => {
+  const u = (req as any).user as { sub: string };
+  const user = await prisma.user.findUnique({ where: { id: u.sub } });
+  if (!user) return res.status(401).json({ error: 'unauthorized' });
+  return res.json({ id: user.id, email: user.email, name: user.name, role: user.role });
+}));
+
 // --- admin: users ---
 app.post('/admin/users', authRequired, requireRole([Role.admin]), ah(async (req, res) => {
   const body = z.object({
@@ -82,6 +89,25 @@ app.post('/beds', authRequired, requireRole([Role.admin, Role.dorm_manager]), ah
 }));
 
 // --- students occupancy ---
+app.get('/students', authRequired, requireRole([Role.admin, Role.dorm_manager]), ah(async (_req, res) => {
+  const list = await prisma.student.findMany({
+    include: {
+      user: true,
+      bed: {
+        include: {
+          room: {
+            include: {
+              building: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(list);
+}));
+
 app.post('/students', authRequired, requireRole([Role.admin, Role.dorm_manager]), ah(async (req, res) => {
   const body = z.object({ userId: z.string(), studentNo: z.string().min(1) }).parse(req.body);
   const s = await prisma.student.create({ data: body, include: { user: true, bed: true } });

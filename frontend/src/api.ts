@@ -25,14 +25,24 @@ async function req(path: string, init: RequestInit = {}) {
   return data;
 }
 
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
 export const api = {
   health: () => req('/health'),
   login: (email: string, password: string) => req('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  me: () => req('/auth/me'),
+
   buildings: () => req('/buildings'),
   createBuilding: (name: string) => req('/buildings', { method: 'POST', body: JSON.stringify({ name }) }),
   createRoom: (buildingId: string, floor: number, number: string) => req('/rooms', { method: 'POST', body: JSON.stringify({ buildingId, floor, number }) }),
   createBed: (roomId: string, label: string) => req('/beds', { method: 'POST', body: JSON.stringify({ roomId, label }) }),
+
+  students: () => req('/students'),
+  createStudent: (userId: string, studentNo: string) => req('/students', { method: 'POST', body: JSON.stringify({ userId, studentNo }) }),
+  checkin: (studentId: string, bedId: string) => req(`/students/${studentId}/checkin`, { method: 'POST', body: JSON.stringify({ bedId }) }),
+  checkout: (studentId: string) => req(`/students/${studentId}/checkout`, { method: 'POST' }),
+
   tickets: () => req('/tickets'),
   createTicket: (title: string, description: string) => req('/tickets', { method: 'POST', body: JSON.stringify({ title, description }) }),
-  updateTicket: (id: string, status: string) => req(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  updateTicket: (id: string, status: TicketStatus) => req(`/tickets/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 };
